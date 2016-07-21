@@ -96,6 +96,8 @@ inject_into_file 'Gemfile', after: "group :development, :test do\n" do
     gem 'factory_girl_rails'
     gem 'ffaker'
 
+    gem 'bullet'
+
   CODE
 end
 
@@ -107,14 +109,12 @@ inject_into_file 'Gemfile', after: "group :development do\n" do
     gem 'capistrano-bundler',  require: false
     gem 'capistrano3-puma',    require: false
 
-    gem 'bullet'
-
     gem 'better_errors'
 
   CODE
 end
 git add: '.'
-git commit: "-m 'Add several useful gems'"
+git commit: "-m 'Add useful gems'"
 
 file 'app/models/settings.rb', <<-'EOF'.strip_heredoc
   class Settings < Settingslogic
@@ -137,20 +137,6 @@ EOF
 run 'cp config/application.yml.tmpl config/application.yml'
 git add: '.'
 git commit: "-m 'Initialize settingslogic'"
-
-inject_into_file 'config/environments/development.rb', after: "Rails.application.configure do\n" do
-  indented_heredoc(<<-CODE, 2)
-    # Bullet settings
-    Bullet.enable        = true
-    Bullet.alert         = true
-    Bullet.console       = true
-    Bullet.bullet_logger = true
-    Bullet.rails_logger  = true
-
-  CODE
-end
-git add: '.'
-git commit: "-m 'Initialize bullet'"
 
 run 'cp config/database.yml.tmpl config/database.yml'
 
@@ -200,6 +186,44 @@ file 'spec/support/factory_girl.rb' do
 end
 git add: '.'
 git commit: "-m 'Initialize rspec, factory_girl'"
+
+inject_into_file 'config/environments/development.rb', after: "Rails.application.configure do\n" do
+  indented_heredoc(<<-CODE, 2)
+    # Bullet settings
+    Bullet.enable        = true
+    Bullet.alert         = true
+    Bullet.console       = true
+    Bullet.add_footer    = true
+    Bullet.bullet_logger = true
+    Bullet.rails_logger  = true
+
+  CODE
+end
+inject_into_file 'config/environments/test.rb', after: "Rails.application.configure do\n" do
+  indented_heredoc(<<-CODE, 2)
+    # Bullet settings
+    Bullet.enable        = true
+    Bullet.raise         = true
+    Bullet.bullet_logger = true
+
+  CODE
+end
+inject_into_file 'spec/rails_helper.rb', after: "RSpec.configure do |config|\n" do
+  indented_heredoc(<<-CODE, 2)
+    if Bullet.enable?
+      config.before(:each) do
+        Bullet.start_request
+      end
+
+      config.after(:each) do
+        Bullet.perform_out_of_channel_notifications if Bullet.notification?
+        Bullet.end_request
+      end
+    end
+  CODE
+end
+git add: '.'
+git commit: "-m 'Initialize bullet'"
 
 Bundler.with_clean_env do
   run 'bundle exec spring binstub --all'
