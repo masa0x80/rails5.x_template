@@ -104,10 +104,10 @@ end
 inject_into_file 'Gemfile', after: "group :development do\n" do
   indented_heredoc(<<-CODE, 2)
     # Use Capistrano for deployment
-    gem 'capistrano-rails',    require: false
-    gem 'capistrano-rbenv',    require: false
-    gem 'capistrano-bundler',  require: false
-    gem 'capistrano3-puma',    require: false
+    gem 'capistrano-rails',   require: false
+    gem 'capistrano-rbenv',   require: false
+    gem 'capistrano-bundler', require: false
+    gem 'capistrano3-puma',   require: false
 
     gem 'better_errors'
 
@@ -137,6 +137,15 @@ EOF
 run 'cp config/application.yml.tmpl config/application.yml'
 git add: '.'
 git commit: "-m 'Initialize settingslogic'"
+
+comment_lines   'config/environments/production.rb', /config.log_level = :debug/
+inject_into_file 'config/environments/production.rb', after: "  # config.log_level = :debug\n" do
+  indented_heredoc(<<-CODE, 2)
+    config.log_level = :info
+  CODE
+end
+git add: '.'
+git commit: "-m 'Change log level in production'"
 
 run 'cp config/database.yml.tmpl config/database.yml'
 
