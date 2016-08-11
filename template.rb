@@ -234,6 +234,10 @@ end
 git add: '.'
 git commit: "-m 'Initialize bullet'"
 
+gsub_file 'config/initializers/session_store.rb', /_session'/, "_session', expire_after: 1.month, secure: Rails.env.production?"
+git add: '.'
+git commit: "-m 'Enable cookie secure flag'"
+
 Bundler.with_clean_env do
   run 'bundle exec spring binstub --all'
 end
