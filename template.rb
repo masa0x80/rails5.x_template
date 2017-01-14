@@ -49,13 +49,13 @@ append_file '.gitignore', <<-EOF.strip_heredoc
   *.swp
   Thumbs.db
 
-  /.envrc
+  .envrc
 
-  /config/database.yml
-  /config/application.yml
+  config/database.yml
+  config/settings.yml
 
-  /vendor/bundle
-  /vendor/bin
+  vendor/bundle
+  vendor/bin
 EOF
 if @flag[:separate_provisioning_repo]
   append_file '.gitignore', <<-EOF.strip_heredoc
@@ -65,11 +65,10 @@ if @flag[:separate_provisioning_repo]
 end
 
 git add: '.'
-git commit: "-m 'Ignore config/{application,database}.yml'"
+git commit: "-m 'Ignore config/{settings,database}.yml'"
 
 # Gemfile
 comment_lines   'Gemfile', /gem 'coffee-rails'/
-uncomment_lines 'Gemfile', /gem 'therubyracer'/
 inject_into_file 'Gemfile', before: "group :development, :test do\n" do
   <<-EOF.strip_heredoc
     gem 'settingslogic'
@@ -86,9 +85,6 @@ inject_into_file 'Gemfile', after: "group :development, :test do\n" do
     gem 'pry-doc'
     gem 'pry-byebug'
     gem 'pry-stack_explorer'
-
-    gem 'awesome_print'
-    gem 'rails-flog', require: 'flog'
 
     gem 'rspec-rails'
     gem 'spring-commands-rspec'
@@ -109,8 +105,6 @@ inject_into_file 'Gemfile', after: "group :development do\n" do
     gem 'capistrano-bundler', require: false
     gem 'capistrano3-puma',   require: false
 
-    gem 'better_errors'
-
   CODE
 end
 git add: '.'
@@ -118,12 +112,12 @@ git commit: "-m 'Add useful gems'"
 
 file 'app/models/settings.rb', <<-'EOF'.strip_heredoc
   class Settings < Settingslogic
-    source "#{Rails.root}/config/application.yml"
+    source "#{Rails.root}/config/settings.yml"
     namespace Rails.env
   end
 EOF
 
-file 'config/application.yml.tmpl', <<-EOF.strip_heredoc
+file 'config/settings.yml.tmpl', <<-EOF.strip_heredoc
   defaults: &defaults
 
   development:
@@ -134,7 +128,7 @@ file 'config/application.yml.tmpl', <<-EOF.strip_heredoc
     <<: *defaults
 EOF
 
-run 'cp config/application.yml.tmpl config/application.yml'
+run 'cp config/settings.yml.tmpl config/settings.yml'
 git add: '.'
 git commit: "-m 'Initialize settingslogic'"
 
@@ -256,7 +250,7 @@ if @flag[:use_devise]
     run 'bundle update'
   end
   git add: '.'
-  git commit: "-m '[gem] devise'"
+  git commit: "-m '[gem] Add devise'"
 
   if @flag[:initialize_devise]
     Bundler.with_clean_env do
@@ -272,8 +266,8 @@ if @flag[:use_devise]
     git commit: "-m '[command] rails g devise user'"
 
     Bundler.with_clean_env do
-      run 'rails db:create'
-      run 'rails db:migrate'
+      run 'bundle exec rails db:create'
+      run 'bundle exec rails db:migrate'
     end
     git add: '.'
     git commit: "-m '[command] rails:db:create; rails db:migrate'"
@@ -326,7 +320,7 @@ if @flag[:use_devise]
       run 'bundle update'
     end
     git add: '.'
-    git commit: "-m '[gem] omniauth-oauth2'"
+    git commit: "-m '[gem] Add omniauth-oauth2'"
   end
 end
 
@@ -345,7 +339,7 @@ if @flag[:use_bootstrap]
     run 'bundle update'
   end
   git add: '.'
-  git commit: "-m '[gem] bootstrap-sass, bootstrap-sass-extras, momentjs-rails, bootstrap-datetimepicker-rails'"
+  git commit: "-m '[gem] Add bootstrap-sass, bootstrap-sass-extras, momentjs-rails, bootstrap-datetimepicker-rails'"
 
   Bundler.with_clean_env do
     generate 'bootstrap:install'
@@ -384,11 +378,10 @@ end
 
 unless @flag[:initialize_devise]
   Bundler.with_clean_env do
-    rake 'db:create'
-    rake 'db:migrate'
+    run 'bundle exec rails db:create'
   end
   git add: '.'
-  git commit: "-m '[command] rake db:create; rake db:migrate'"
+  git commit: "-m '[command] rails db:create'"
 
   file 'app/controllers/top_controller.rb', <<-CODE.strip_heredoc
     class TopController < ApplicationController
@@ -417,7 +410,7 @@ if @flag[:use_kaminari]
     run 'bundle update'
   end
   git add: '.'
-  git commit: "-m '[gem] kaminari'"
+  git commit: "-m '[gem] Add kaminari'"
 
   Bundler.with_clean_env do
     generate 'kaminari:config'
@@ -447,21 +440,21 @@ if @flag[:use_knife]
     run "git commit -m 'Fix ruby version'",               config
 
     # direnv settings
-    run 'echo \'export PATH=$PWD/bin:$PWD/vendor/bin:$PATH\' > .envrc && direnv allow', config
+    run 'echo \'export PATH=$PWD/vendor/bin:$PATH\' > .envrc && direnv allow', config
 
     # .gitignore
     file 'provisioning/.gitignore', <<-EOF.strip_heredoc
       .DS_Store
       *.swp
 
-      /.bundle
+      .bundle
 
-      /.envrc
+      .envrc
 
-      /vendor/bundle
-      /vendor/bin
-      /.chef/data_bag_key
-      /.vagrant
+      vendor/bundle
+      vendor/bin
+      .chef/data_bag_key
+      .vagrant
     EOF
 
     run 'git add .',                                config
@@ -473,7 +466,6 @@ if @flag[:use_knife]
     append_file 'provisioning/Gemfile', <<-EOF.strip_heredoc
 
       gem 'knife-solo', '~> 0.4.0'
-      gem 'knife-solo_data_bag'
       gem 'berkshelf'
     EOF
     Bundler.with_clean_env do
@@ -484,8 +476,8 @@ if @flag[:use_knife]
   else
     # .gitignore
     file 'provisioning/.gitignore', <<-EOF.strip_heredoc
-      /.chef/data_bag_key
-      /.vagrant
+      .chef/data_bag_key
+      .vagrant
     EOF
 
     git add: '.'
@@ -494,7 +486,6 @@ if @flag[:use_knife]
     inject_into_file 'Gemfile', after: "group :development do\n" do
       indented_heredoc(<<-CODE, 2)
         gem 'knife-solo', '~> 0.4.0'
-        gem 'knife-solo_data_bag'
         gem 'berkshelf'
 
       CODE
@@ -503,7 +494,7 @@ if @flag[:use_knife]
       run 'bundle update'
     end
     git add: '.'
-    git commit: "-m '[gem] knife-solo, knife-solo_data_bag, berkshelf'"
+    git commit: "-m '[gem] Add knife-solo, berkshelf'"
   end
 
   Bundler.with_clean_env do
