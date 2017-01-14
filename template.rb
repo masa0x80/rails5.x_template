@@ -15,9 +15,16 @@ end
 if @flag[:use_kaminari]
   @kaminari_theme = ask("\tWhich kaminari theme? [none|bootstrap3|google|purecss|semantic_ui]")
 end
-@flag[:use_knife] = yes?('Use knife-solo? [y|n]')
-if @flag[:use_knife]
-  @flag[:separate_provisioning_repo] = yes?("\tSeparate provisioning repository from #{@app_name}? [y|n]")
+@flag[:use_knife_zero] = yes?('User knife-zero? [y|n]')
+if @flag[:use_knife_zero]
+  if @flag[:use_knife_zero]
+    @flag[:separate_provisioning_repo] = yes?("\tSeparate provisioning repository from #{@app_name}? [y|n]")
+  end
+else
+  @flag[:use_knife_solo] = yes?('Use knife-solo? [y|n]')
+  if @flag[:use_knife_solo]
+    @flag[:separate_provisioning_repo] = yes?("\tSeparate provisioning repository from #{@app_name}? [y|n]")
+  end
 end
 
 def indented_heredoc(data, indent = 0)
@@ -427,7 +434,107 @@ if @flag[:use_kaminari]
   end
 end
 
-if @flag[:use_knife]
+if @flag[:use_knife_zero]
+  run 'mkdir provisioning'
+
+  config = {with: 'cd provisioning && '}
+  if @flag[:separate_provisioning_repo]
+    run 'git init', config
+
+    # Fix ruby version
+    run 'rbenv local $(rbenv version | cut -d " " -f 1)', config
+    run 'git add .ruby-version',                          config
+    run "git commit -m 'Fix ruby version'",               config
+
+    # direnv settings
+    run 'echo \'export PATH=$PWD/vendor/bin:$PATH\' > .envrc && direnv allow', config
+
+    # .gitignore
+    file 'provisioning/.gitignore', <<-EOF.strip_heredoc
+      .DS_Store
+      *.swp
+
+      .bundle
+
+      .envrc
+
+      vendor/bundle
+      vendor/bin
+      clients/
+      cookbooks/
+      .chef/data_bag_key
+      .vagrant
+    EOF
+
+    run 'git add .',                                config
+    run "git commit -m 'Ignore data_bag_key file'", config
+
+    Bundler.with_clean_env do
+      run 'bundle init', config
+    end
+    append_file 'provisioning/Gemfile', <<-EOF.strip_heredoc
+
+      gem 'knife-zero'
+      gem 'berkshelf'
+    EOF
+    Bundler.with_clean_env do
+      run 'bundle install --path=vendor/bundle --binstubs=vendor/bin --jobs=4 --gemfile=Gemfile; bundle package', config
+    end
+    run 'git add .',                                                                                             config
+    run 'git commit -m \'[command] bundle install --path=vendor/bundle --binstubs=vendor/bin; bundle package\'', config
+  else
+    # .gitignore
+    file 'provisioning/.gitignore', <<-EOF.strip_heredoc
+      clients/
+      cookbooks/
+      .chef/data_bag_key
+      .vagrant
+    EOF
+
+    git add: '.'
+    git commit: "-m 'Ignore data_bag_key file'"
+
+    inject_into_file 'Gemfile', after: "group :development do\n" do
+      indented_heredoc(<<-CODE, 2)
+        gem 'knife-zero'
+        gem 'berkshelf'
+
+      CODE
+    end
+    Bundler.with_clean_env do
+      run 'bundle update'
+    end
+    git add: '.'
+    git commit: "-m '[gem] Add knife-zero, berkshelf'"
+  end
+
+  run 'mkdir .chef',                                   config
+  run 'openssl rand -base64 512 > .chef/data_bag_key', config
+  file 'provisioning/.chef/config.rb' do
+    <<-EOF.strip_heredoc
+      cookbook_path %w(cookbooks site-cookbooks)
+      environment_path 'environments'
+      node_path 'nodes'
+      role_path 'roles'
+      data_bag_path 'data_bags'
+      local_mode true
+
+      knife[:ssh_attribute] = 'knife_zero.host'
+      knife[:secret_file]   = File.join(File.dirname(__FILE__), 'data_bag_key')
+      knife[:encrypt]       = true
+      knife[:use_sudo]      = true
+
+      knife[:default_attribute_whitelist]   = []
+      knife[:override_attribute_whitelist]  = []
+      knife[:automatic_attribute_whitelist] = []
+      knife[:normal_attribute_whitelist]    = ['knife_zero']
+    EOF
+  end
+  run 'git add .',                                         config
+  run 'git commit -m \'Add .chef/config.rb, .chef/data_bag_key\'', config
+end
+
+if @flag[:use_knife_solo]
   run 'mkdir provisioning'
 
   config = {with: 'cd provisioning && '}
