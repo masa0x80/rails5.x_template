@@ -3,5 +3,5 @@
 ## Usage
 
 ```
-rails new -m template.rb
+rails new APP_NAME -d mysql -m template.rb
 ```
