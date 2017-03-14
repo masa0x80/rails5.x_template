@@ -15,7 +15,7 @@ end
 if @flag[:use_kaminari]
   @kaminari_theme = ask("\tWhich kaminari theme? [none|bootstrap3|google|purecss|semantic_ui]")
 end
-@flag[:use_knife_zero] = yes?('User knife-zero? [y|n]')
+@flag[:use_knife_zero] = yes?('Use knife-zero? [y|n]')
 if @flag[:use_knife_zero]
   if @flag[:use_knife_zero]
     @flag[:separate_provisioning_repo] = yes?("\tSeparate provisioning repository from #{@app_name}? [y|n]")
@@ -523,6 +523,9 @@ if @flag[:use_knife_zero]
       knife[:secret_file]   = File.join(File.dirname(__FILE__), 'data_bag_key')
       knife[:encrypt]       = true
       knife[:use_sudo]      = true
+
+      knife[:before_bootstrap] = 'berks vendor cookbooks'
+      knife[:before_converge]  = 'berks vendor cookbooks'
 
       knife[:default_attribute_whitelist]   = []
       knife[:override_attribute_whitelist]  = []
